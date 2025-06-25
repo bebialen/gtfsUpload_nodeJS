@@ -25,12 +25,12 @@ export const uploadGTFS = async (req, res) => {
   const zipPath = req.file?.path;
 
   if (!zipPath) {
-    return res.status(400).json({ error: 'No file uploaded' });
+    return res.status(400).json({ logcode: 6002, error: 'No file uploaded' });
   }
 
   try {
     if (!fs.existsSync(zipPath)) {
-      return res.status(400).json({ error: 'Uploaded file does not exist' });
+      return res.status(400).json({ logcode: 6002, error: 'Uploaded file does not exist' });
     }
 
     // Clean or recreate extraction folder
@@ -45,7 +45,7 @@ export const uploadGTFS = async (req, res) => {
         .pipe(unzipper.Extract({ path: extractPath }))
         .promise();
     } catch (zipErr) {
-      return res.status(400).json({ error: 'Invalid or corrupted ZIP file' });
+      return res.status(400).json({ logcode: 6002, error: 'Invalid or corrupted ZIP file' });
     }
 
     const tables = [
@@ -121,13 +121,14 @@ export const uploadGTFS = async (req, res) => {
       }
     }
 
-    res.json({
+    return res.json({
+      logcode: 6000,
       message: 'GTFS data upload completed',
       totalInserted,
       warnings: errors.length ? errors : undefined
     });
   } catch (err) {
     console.error('Unexpected error:', err);
-    res.status(500).json({ error: 'Unexpected server error during GTFS upload' });
+    return res.status(500).json({ logcode: 6001, error: 'Unexpected server error during GTFS upload' });
   }
 };

@@ -9,10 +9,10 @@ import { getTrips } from '../controller/tripsController.js';
 const upload = multer({ dest: 'uploads/' });
 const router = express.Router();
 
-router.post('/upload', upload.single('file'), uploadGTFS);
-router.get('/routes', getRoutes);
-router.get('/stops', getStops);
-router.get('/trips', getTrips);
+router.post('/api/upload', upload.single('file'), uploadGTFS);
+router.get('/api/routes', getRoutes);
+router.get('/api/stops', getStops);
+router.get('/api/trips', getTrips);
 // router.get('/api/routes/:route_id/stops', getStopsByRoute);
 router.get('/api/trips/:route_id/stops', getTripsByRoute);
 
