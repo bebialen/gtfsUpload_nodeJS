@@ -2,12 +2,38 @@ import { db } from './../config/db.js';
 
 export const getRoutes = async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM routes');
+    const [rows] = await db.query(`
+  SELECT 
+    r.route_id,
+    r.agency_id,
+    r.route_short_name,
+    r.route_long_name,
+    r.route_type,
+    t.trip_id,
+    MIN(st.arrival_time) AS first_arrival_time
+  FROM 
+    routes r
+  LEFT JOIN trips t ON r.route_id = t.route_id
+  LEFT JOIN stop_times st ON t.trip_id = st.trip_id
+  GROUP BY 
+    r.route_id, 
+    r.agency_id, 
+    r.route_short_name, 
+    r.route_long_name, 
+    r.route_type,
+    t.trip_id
+  ORDER BY 
+    r.route_id, t.trip_id;
+`);
+
+
     res.json(rows);
   } catch (err) {
+    console.error('Failed to fetch routes with arrival time:', err);
     res.status(500).json({ error: 'Failed to fetch routes' });
   }
 };
+
 
 
 export const getStopsByRoute = async (req, res) => {
