@@ -1,6 +1,0 @@
-stop_id,Stop name ,stop_lat,stop_lon,stop_desc,location_type,route_id,zone_id,wheelchair_boarding
-STOP1,Aluva,10.1094,76.34977,GATE B,0,ROUTE1,ZONE1,1
-STOP2,Airport_Arch,10.15949,76.38595,MAIN ARCH,0,ROUTE1,ZONE1,1
-STOP3,Airport_Arch_Opposite,10.15939,76.38659,MAIN ARCH,0,ROUTE1,ZONE1,1
-STOP4,International,10.15794,76.393,TERMINAL 3,0,ROUTE1,ZONE1,1
-STOP5,Domestic,10.15575,76.39154,TERMINAL 1,0,ROUTE1,ZONE1,1
