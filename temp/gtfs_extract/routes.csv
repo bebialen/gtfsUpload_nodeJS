@@ -1,0 +1,3 @@
+route_id,route_short_name,route_long_name,route_type,agency_id
+ROUTE1,Aluva MS-CIAL,Aluva Metro Station- Cochin International Airport Limited,3,KMRL
+ROUTE1,CIAL-Aluva MS,Cochin International Airport Limited- Aluva Metro Station,3,KMRL

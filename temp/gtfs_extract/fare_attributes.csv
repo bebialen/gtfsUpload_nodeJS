@@ -1,0 +1,2 @@
+fare_id,price,agency_id,currency_type,payment_method,transfers
+FARE1,80,KMRL,INR,1,0
