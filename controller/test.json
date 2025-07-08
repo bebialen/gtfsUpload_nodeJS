@@ -1,0 +1,46 @@
+{
+    "logcode": 6000,
+    "messages": [
+        "GTFS data upload completed"
+    ],
+    "totalTables": 9,
+    "totalInserted": 176,
+    "uploadedFiles": [
+        "agency.csv",
+        "calendar.csv",
+        "fare_attributes.csv",
+        "fare_rules.csv",
+        "frequencies.csv",
+        "routes.csv",
+        "stops.csv",
+        "stop_times.csv",
+        "trips.csv"
+    ],
+    "rowCount": [
+        {
+            "agency.csv": 1,
+            "calendar.csv": 1,
+            "fare_attributes.csv": 1,
+            "fare_rules.csv": 1,
+            "frequencies.csv": 80,
+            "routes.csv": 2,
+            "stops.csv": 5,
+            "stop_times.csv": 5,
+            "trips.csv": 80
+        }
+    ], "data" : [
+        {
+            "table_name" : "agency.csv",
+            "count" : 1
+        },{
+            "table_name" : "calendar.csv",
+            "count" : 10
+        },{
+            "table_name" : "agency.csv",
+            "count" : 1
+        },{
+            "table_name" : "agency.csv",
+            "count" : 1
+        }
+    ]
+}
