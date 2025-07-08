@@ -10,7 +10,7 @@ const upload = multer({ dest: 'uploads/' });
 const router = express.Router();
 
 router.post('/api/upload', upload.single('file'), uploadGTFS);
-router.post('/upload/stop_times', upload.single('file'), uploadStopTimes);
+// router.post('/upload/stop_times', upload.single('file'), uploadStopTimes);
 router.get('/api/routes', getRoutes);
 router.get('/api/stops', getStops);
 router.get('/api/trips', getTrips);

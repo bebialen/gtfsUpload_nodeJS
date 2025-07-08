@@ -245,92 +245,92 @@ import { fileURLToPath } from 'url';
 
 // //----------------------------------------------//
 
-export const uploadStopTimes = async (req, res) => {
-  const filePath = req.file?.path;
-  if (!filePath) return res.status(400).json({ error: 'No file uploaded' });
+// export const uploadStopTimes = async (req, res) => {
+//   const filePath = req.file?.path; 
+//   if (!filePath) return res.status(400).json({ error: 'No file uploaded' });
 
-  try {
-    const [columns] = await db.query(`SHOW COLUMNS FROM stop_times`);
-    const dbColumns = columns.map(col => col.Field);
+//   try {
+//     const [columns] = await db.query(`SHOW COLUMNS FROM stop_times`);
+//     const dbColumns = columns.map(col => col.Field);
 
-    const headers = await new Promise((resolve, reject) => {
-      const stream = fs.createReadStream(filePath).pipe(csv());
-      stream.on('data', (row) => {
-        stream.destroy();
-        resolve(Object.keys(row));
-      });
-      stream.on('error', reject);
-    });
+//     const headers = await new Promise((resolve, reject) => {
+//       const stream = fs.createReadStream(filePath).pipe(csv());
+//       stream.on('data', (row) => {
+//         stream.destroy();
+//         resolve(Object.keys(row));
+//       });
+//       stream.on('error', reject);
+//     });
 
-    const filteredKeys = headers.filter(k => dbColumns.includes(k));
-    const batch = [];
+//     const filteredKeys = headers.filter(k => dbColumns.includes(k));
+//     const batch = [];
 
-    const totalLines = await new Promise((resolve) => {
-      let count = 0;
-      fs.createReadStream(filePath)
-        .pipe(csv())
-        .on('data', () => count++)
-        .on('end', () => resolve(count));
-    });
+//     const totalLines = await new Promise((resolve) => {
+//       let count = 0;
+//       fs.createReadStream(filePath)
+//         .pipe(csv())
+//         .on('data', () => count++)
+//         .on('end', () => resolve(count));
+//     });
 
-    const bar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-    bar.start(totalLines, 0);
+//     const bar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+//     bar.start(totalLines, 0);
 
-    await new Promise((resolve, reject) => {
-      const stream = fs.createReadStream(filePath).pipe(csv());
-      let processed = 0;
+//     await new Promise((resolve, reject) => {
+//       const stream = fs.createReadStream(filePath).pipe(csv());
+//       let processed = 0;
 
-      stream.on('data', async (row) => {
-        processed++;
-        bar.update(processed);
+//       stream.on('data', async (row) => {
+//         processed++;
+//         bar.update(processed);
 
-        const record = {};
-        for (const key of filteredKeys) {
-          record[key] = row[key] ?? null;
-        }
+//         const record = {};
+//         for (const key of filteredKeys) {
+//           record[key] = row[key] ?? null;
+//         }
 
-        batch.push(record);
+//         batch.push(record);
 
-        if (batch.length >= 500) {
-          stream.pause();
-          try {
-            await insertBatch(batch, filteredKeys, 'stop_times');
-            batch.length = 0;
-            stream.resume();
-          } catch (err) {
-            stream.destroy();
-            bar.stop();
-            reject(err);
-          }
-        }
-      });
+//         if (batch.length >= 500) {
+//           stream.pause();
+//           try {
+//             await insertBatch(batch, filteredKeys, 'stop_times');
+//             batch.length = 0;
+//             stream.resume();
+//           } catch (err) {
+//             stream.destroy();
+//             bar.stop();
+//             reject(err);
+//           }
+//         }
+//       });
 
-      stream.on('end', async () => {
-        if (batch.length > 0) {
-          try {
-            await insertBatch(batch, filteredKeys, 'stop_times');
-          } catch (err) {
-            bar.stop();
-            return reject(err);
-          }
-        }
-        bar.stop();
-        resolve();
-      });
+//       stream.on('end', async () => {
+//         if (batch.length > 0) {
+//           try {
+//             await insertBatch(batch, filteredKeys, 'stop_times');
+//           } catch (err) {
+//             bar.stop();
+//             return reject(err);
+//           }
+//         }
+//         bar.stop();
+//         resolve();
+//       });
 
-      stream.on('error', (err) => {
-        bar.stop();
-        reject(err);
-      });
-    });
+//       stream.on('error', (err) => {
+//         bar.stop();
+//         reject(err);
+//       });
+//     });
 
-    res.json({ message: 'stop_times uploaded successfully' });
+//     res.json({ message: 'stop_times uploaded successfully' });
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: 'Server error' });
+//   }
+// };
 
 
 
@@ -380,6 +380,17 @@ async function insertBatch(batch, keys, table) {
   const query = `INSERT IGNORE INTO ${table} (${keys.join(', ')}) VALUES ${values}`;
   await db.query(query);
 }
+async function countRowsInFile(filePath) {
+  return new Promise((resolve, reject) => {
+    let rowCount = 0;
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on('data', () => rowCount++)
+      .on('end', () => resolve(rowCount))
+      .on('error', (err) => reject(err));
+  });
+}
+
 
 export const uploadGTFS = async (req, res) => {
   const zipPath = req.file?.path;
@@ -407,6 +418,20 @@ export const uploadGTFS = async (req, res) => {
         .promise();
     } catch (zipErr) {
       return res.status(400).json({ logcode: 6002, error: 'Invalid or corrupted ZIP file' });
+    }
+    const uploadedFiless= listUploadedFiles(extractPath);
+
+          
+    const rowCounts = {};
+
+    for (const file of uploadedFiless) {
+      const filePath = path.join(extractPath, file);
+      try {
+        const rowCount = await countRowsInFile(filePath);
+        rowCounts[file] = rowCount;
+      } catch (err) {
+        rowCounts[file] = 'Error counting rows';
+      }
     }
 
     const tables = [
@@ -539,6 +564,16 @@ export const uploadGTFS = async (req, res) => {
       }
       return files;
     }
+    async function countRowsInFile(filePath) {
+  return new Promise((resolve, reject) => {
+    let rowCount = 0;
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on('data', () => rowCount++)
+      .on('end', () => resolve(rowCount))
+      .on('error', (err) => reject(err));
+  });
+}
 
     const uploadedFiles = listUploadedFiles(extractPath);
     uploadedFileHashes.add(fileHash);
@@ -547,8 +582,9 @@ export const uploadGTFS = async (req, res) => {
       logcode: 6000,
       messages: ['GTFS data upload completed'],
       totalTables: tables.length,
-      totalInserted,
-      uploadedFiles,
+      totalInserted ,
+      uploadedFiles ,
+      rowCount:[rowCounts],
       warnings: errors.length ? errors : undefined,
     });
   } catch (err) {
