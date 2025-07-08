@@ -6,6 +6,7 @@ import csv from 'csv-parser';
 import cliProgress from 'cli-progress';
 import { db } from '../config/db.js';
 import { fileURLToPath } from 'url';
+import { count } from 'console';
 
 // const __filename = fileURLToPath(import.meta.url);
 // const __dirname = path.dirname(__filename);
@@ -340,7 +341,7 @@ const __dirname = path.dirname(__filename);
 const extractPath = path.join(__dirname, '../temp/gtfs_extract');
 
 // Simulated in-memory hash store (replace with DB or Redis in production)
-const uploadedFileHashes = new Set();
+// const uploadedFileHashes = new Set();
 
 function computeFileHash(filePath) {
   const fileBuffer = fs.readFileSync(filePath);
@@ -348,6 +349,7 @@ function computeFileHash(filePath) {
 }
 
 function findGTFSFile(dir, filename) {
+
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
@@ -405,9 +407,11 @@ export const uploadGTFS = async (req, res) => {
     }
 
     const fileHash = computeFileHash(zipPath);
-    if (uploadedFileHashes.has(fileHash)) {
-      return res.status(409).json({ logcode: 6003, error: 'This file has already been uploaded successfully.' });
-    }
+
+    console.log("the file hash is" + fileHash);
+    // if (uploadedFileHashes.has(fileHash)) {
+    //   return res.status(409).json({ logcode: 6003, error: 'This file has already been uploaded successfully.' });
+    // }
 
     clearDirectory(extractPath);
     fs.mkdirSync(extractPath, { recursive: true });
@@ -422,13 +426,17 @@ export const uploadGTFS = async (req, res) => {
     const uploadedFiless= listUploadedFiles(extractPath);
 
           
-    const rowCounts = {};
+    const rowCounts = [];
 
     for (const file of uploadedFiless) {
       const filePath = path.join(extractPath, file);
       try {
         const rowCount = await countRowsInFile(filePath);
-        rowCounts[file] = rowCount;
+        // rowCounts[file] = rowCount;
+        rowCounts.push(rowCount);
+
+        console.log(`1)  the rowCounts --> ${rowCounts[file]}`);
+        console.log(`2)  the rowCounts --> ${rowCount}`);
       } catch (err) {
         rowCounts[file] = 'Error counting rows';
       }
@@ -576,15 +584,42 @@ export const uploadGTFS = async (req, res) => {
 }
 
     const uploadedFiles = listUploadedFiles(extractPath);
-    uploadedFileHashes.add(fileHash);
+    // uploadedFileHashes.add(fileHash);
 
+    const map = new Map();
+    
+  
+    for(let i = 0; i<uploadedFiles.length ;i++ ){
+      
+      // console.log(tables[i])
+      
+      
+      map.set(uploadedFiles[i],rowCounts[i]);
+      // console.log(`the value is ${value}`);
+      console.log(`the value issss ${Array.from(map.values())}`);
+
+      
+      // value = myVal;
+      // console.log(myVal);
+     }
+
+     const tableStats = Array.from(map,([key, val])=>({ //destructuring
+      table_name:key,
+      count:val
+
+    }))
+
+    console.log(tableStats.values);
+    console.log(`the map values are ${map.values()}`);
+    const mapVal = map.values();
+    const mapObject = Object.fromEntries(map);
     return res.json({
       logcode: 6000,
       messages: ['GTFS data upload completed'],
       totalTables: tables.length,
       totalInserted ,
-      uploadedFiles ,
-      rowCount:[rowCounts],
+      
+      value:tableStats,
       warnings: errors.length ? errors : undefined,
     });
   } catch (err) {
