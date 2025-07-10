@@ -6,8 +6,8 @@ import csv from 'csv-parser';
 import cliProgress from 'cli-progress';
 import { db } from '../config/db.js';
 import { fileURLToPath } from 'url';
-import { count } from 'console';
-
+import {clearDirectory,findGTFSFile,insertBatch,listUploadedFiles} from '../functions/gtfsUtils.js'
+import { createProgressBar } from '../functions/helpers/cliProgress.helper.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,63 +15,9 @@ const __dirname = path.dirname(__filename);
 
 const extractPath = path.join(__dirname, '../temp/gtfs_extract');
 
-// Simulated in-memory hash store (replace with DB or Redis in production)
-// const uploadedFileHashes = new Set();
-
-function computeFileHash(filePath) {
-  const fileBuffer = fs.readFileSync(filePath);
-  return crypto.createHash('sha256').update(fileBuffer).digest('hex');
-}
-
-function findGTFSFile(dir, filename) {
-
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      const found = findGTFSFile(fullPath, filename);
-      if (found) return found;
-    } else {
-      const lowerName = entry.name.toLowerCase();
-      if (lowerName === `${filename}.csv` || lowerName === `${filename}.txt`) {
-        return fullPath;
-      }
-    }
-  }
-  return null;
-}
-
-function clearDirectory(dirPath) {
-  if (fs.existsSync(dirPath)) {
-    fs.readdirSync(dirPath).forEach(file => {
-      const fullPath = path.join(dirPath, file);
-      fs.rmSync(fullPath, { recursive: true, force: true });
-    });
-  }
-}
-
-async function insertBatch(batch, keys, table) {
-  const values = batch.map(row =>
-    `(${keys.map(k => db.escape(row[k])).join(', ')})`
-  ).join(', ');
-  const query = `INSERT IGNORE INTO ${table} (${keys.join(', ')}) VALUES ${values}`;
-  await db.query(query);
-}
-async function countRowsInFile(filePath) {
-  return new Promise((resolve, reject) => {
-    let rowCount = 0;
-    fs.createReadStream(filePath)
-      .pipe(csv())
-      .on('data', () => rowCount++)
-      .on('end', () => resolve(rowCount))
-      .on('error', (err) => reject(err));
-  });
-}
-
 
 export const uploadGTFS = async (req, res) => {
   const zipPath = req.file?.path;
-
   if (!zipPath) {
     return res.status(400).json({ logcode: 6002, error: 'No file uploaded' });
   }
@@ -79,17 +25,17 @@ export const uploadGTFS = async (req, res) => {
   try {
     if (!fs.existsSync(zipPath)) {
       return res.status(400).json({ logcode: 6002, error: 'Uploaded file does not exist' });
-    }
+    } //base case 
 
-    const fileHash = computeFileHash(zipPath);
+    // const fileHash = computeFileHash(zipPath);
 
-    console.log("the file hash is" + fileHash);
+    // console.log("the file hash is" + fileHash);
     // if (uploadedFileHashes.has(fileHash)) {
     //   return res.status(409).json({ logcode: 6003, error: 'This file has already been uploaded successfully.' });
     // }
 
-    clearDirectory(extractPath);
-    fs.mkdirSync(extractPath, { recursive: true });
+    clearDirectory(extractPath);   //clear files in the directory if something exists 
+    fs.mkdirSync(extractPath, { recursive: true }); //create new directory 
 
     try {
       await fs.createReadStream(zipPath)
@@ -100,7 +46,7 @@ export const uploadGTFS = async (req, res) => {
     }
     const uploadedFiless= listUploadedFiles(extractPath);
 
-          
+  //FUNCTION SCOPE   
     const rowCounts = [];
 
     for (const file of uploadedFiless) {
@@ -109,9 +55,6 @@ export const uploadGTFS = async (req, res) => {
         const rowCount = await countRowsInFile(filePath);
         // rowCounts[file] = rowCount;
         rowCounts.push(rowCount);
-
-        console.log(`1)  the rowCounts --> ${rowCounts[file]}`);
-        console.log(`2)  the rowCounts --> ${rowCount}`);
       } catch (err) {
         rowCounts[file] = 'Error counting rows';
       }
@@ -165,14 +108,9 @@ export const uploadGTFS = async (req, res) => {
           fs.createReadStream(filePath).pipe(csv()).on('data', () => count++).on('end', () => resolve(count));
         });
 
-        const bar = new cliProgress.SingleBar({
-          format: `➡️ {table} [{bar}] {percentage}% | {value}/{total} rows`,
-          barCompleteChar: '█',
-          barIncompleteChar: '.',
-          hideCursor: true
-        }, cliProgress.Presets.shades_classic);
 
-        bar.start(totalLines, 0, { table });
+        const bar = createProgressBar(totalLines, table);  //Progress bar 
+
 
         await new Promise((resolve, reject) => {
           const stream = fs.createReadStream(filePath).pipe(csv());
@@ -197,7 +135,7 @@ export const uploadGTFS = async (req, res) => {
             if (batch.length >= 500) {
               stream.pause();
               try {
-                await insertBatch(batch, filteredKeys, table);
+                await insertBatch(batch, filteredKeys, table,db);
                 totalInserted += batch.length;
                 batch.length = 0;
                 stream.resume();
@@ -212,7 +150,7 @@ export const uploadGTFS = async (req, res) => {
           stream.on('end', async () => {
             if (batch.length > 0) {
               try {
-                await insertBatch(batch, filteredKeys, table);
+                await insertBatch(batch, filteredKeys, table,db);
                 totalInserted += batch.length;
               } catch (e) {
                 bar.stop();
@@ -230,7 +168,7 @@ export const uploadGTFS = async (req, res) => {
         });
 
       } catch (err) {
-        errors.push(`❌ Failed to process ${table}: ${err.message}`);
+        errors.push(`Failed to process ${table}: ${err.message}`);
       }
     }
 
@@ -265,17 +203,10 @@ export const uploadGTFS = async (req, res) => {
     
   
     for(let i = 0; i<uploadedFiles.length ;i++ ){
-      
-      // console.log(tables[i])
-      
-      
       map.set(uploadedFiles[i],rowCounts[i]);
       // console.log(`the value is ${value}`);
       console.log(`the value issss ${Array.from(map.values())}`);
 
-      
-      // value = myVal;
-      // console.log(myVal);
      }
 
      const tableStats = Array.from(map,([key, val])=>({ //destructuring
@@ -284,10 +215,8 @@ export const uploadGTFS = async (req, res) => {
 
     }))
 
-    console.log(tableStats.values);
-    console.log(`the map values are ${map.values()}`);
-    const mapVal = map.values();
-    const mapObject = Object.fromEntries(map);
+    
+   
     return res.json({
       logcode: 6000,
       messages: ['GTFS data upload completed'],
@@ -297,7 +226,7 @@ export const uploadGTFS = async (req, res) => {
       warnings: errors.length ? errors : undefined,
     });
   } catch (err) {
-    console.error('Unexpected error:', err);
+    // console.error('Unexpected error:', err);
     return res.status(500).json({ logcode: 6001, error: 'Unexpected server error during GTFS upload' });
   }
 };
